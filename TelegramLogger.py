@@ -14,7 +14,6 @@ class SimpleTelegramLogger:
         self.chat_id = chat_id
         self.input_queue = Queue()
         self.active = True
-        self.buffer = ""
 
         # Сохраняем оригинальные потоки
         self.original_stdout = sys.stdout
@@ -35,7 +34,7 @@ class SimpleTelegramLogger:
         def handle_message(msg):
             if msg.text:
                 self.input_queue.put(msg.text)
-                self.original_stdout.write(f"[Telegram Input] {msg.text}")
+                self.original_stdout.write(f"[Telegram Input] {msg.text}\n")
 
         # Запускаем бота в отдельном потоке
         Thread(target=self.bot.infinity_polling, daemon=True).start()
@@ -44,21 +43,16 @@ class SimpleTelegramLogger:
         for i in range(0, len(message), self.max_length):
             chunk = message[i:i + self.max_length]
             self.bot.send_message(self.chat_id, chunk)
-        self.buffer = ""
 
-    def write(self, message, bool_buffer=True):
+    def write(self, message, line_feed=True):
         if message.strip():
-            # Выводим в оригинальный stdout
             def write_format(x: str) -> str:
-                return x + "\n" if bool_buffer else x
+                return x + "\n" if line_feed else x
 
             self.original_stdout.write(write_format(message))
 
-            # Отправляем в Telegram (без буферизации)
             try:
-                self.buffer += message
-                if "\n" in self.buffer or not bool_buffer:
-                    self.send_telegram_message(self.buffer)
+                self.send_telegram_message(message)
             except Exception as e:
                 self.original_stdout.write(f"\nОшибка Telegram: {e}\n")
 
@@ -67,7 +61,7 @@ class SimpleTelegramLogger:
 
     def _input_handler(self, prompt=""):
         if prompt:
-            self.write(prompt, bool_buffer=False)
+            self.write(prompt, line_feed=False)
         return self.input_queue.get()
 
     def _read_console_input(self):
