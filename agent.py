@@ -1,13 +1,11 @@
 from typing import Annotated
 from langchain_ollama import ChatOllama
-from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import create_react_agent
 from typing_extensions import TypedDict
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.checkpoint.memory import InMemorySaver
-
-from tools import tools
+from tools import tools, extract_tool_calls_and_results
 
 memory = InMemorySaver()
 llm = ChatOllama(model="llama3.1")
@@ -25,7 +23,7 @@ def chatbot(state: State):
 def invoke_graph_updates(user_input: str, config: dict):
     # The config is the **second positional argument** to stream() or invoke()!
     events = agent.invoke(
-        {"messages": [{"role": "user", "content": user_input}]},
+        {"messages": [{"role": "system", "content": "You are a helpful, friendly assistant with whom you can chat. Call for tools only if you really need additional information."}, {"role": "user", "content": user_input}]},
         config,
         stream_mode="values",
     )
@@ -43,15 +41,25 @@ def stream_graph_pretty(user_input: str, config: dict):
         event["messages"][-1].pretty_print()
 
 
+from TelegramLogger import SimpleTelegramLogger
+from API import API_bot, my_chat_id
+import telebot
+#logger = SimpleTelegramLogger(telebot.TeleBot(API_bot), my_chat_id)
+
 while True:
     config = {"configurable": {"thread_id": "1"}}
     user_input = input("User: ")
     if user_input.lower() in ["quit", "exit", "q"]:
         print("Goodbye!")
         break
+    if user_input.lower() in ["t"]:
+        history = list(agent.get_state_history(config))
+        extract_tool_calls_and_results(history)
+        continue
     if user_input.lower() in ["s"]:
         for state in agent.get_state_history(config):
-            print("Num Messages: ", len(state.values["messages"]), "Next: ", state.next, "Message:", state.values["messages"])
+            messages = state.values["messages"]
+            print(f"Num Messages: {len(messages)} Next: {state.next} Message: {messages}")
         continue
     #stream_graph_pretty(user_input, config)
-    print("Assistant: ", invoke_graph_updates(user_input, config))
+    print("Assistant: " + invoke_graph_updates(user_input, config))

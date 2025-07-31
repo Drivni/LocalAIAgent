@@ -1,24 +1,8 @@
 from typing import Dict, Any
+
+from langchain_core.messages import ToolMessage, AIMessage
 from langchain_core.tools import tool
 import requests
-
-
-@tool
-def my_custom_tool(param1: str, param2: int) -> str:
-    """Process inputs and return a string result."""
-    return f"Processed {param1} and {param2}"
-
-
-@tool
-def add(first_int: int, second_int: int) -> int:
-    """Add two integers."""
-    return first_int + second_int
-
-
-@tool
-def exponentiate(base: int, exponent: int) -> int:
-    """Exponentiate the base to the exponent power."""
-    return base ** exponent
 
 
 @tool
@@ -56,6 +40,7 @@ def get_nbrb_currency_rate(currency_code):
         print(f"Валюта {currency_code} не найдена или API изменилось.")
         return None
 
+
 @tool
 def convert_currency(from_currency: str, to_currency: str, amount: float = 1) -> float or None:
     """Convert amount from one currency to another"""
@@ -83,3 +68,38 @@ def convert_currency(from_currency: str, to_currency: str, amount: float = 1) ->
 
 
 tools = [convert_currency, get_weather]
+
+
+def extract_tool_calls_and_results(state_snapshots):
+    tool_results = {}
+    seen = set()  # для хранения (tool_call_id, result) уже выведенных
+
+    # Собираем все результаты вызовов инструментов
+    for state in reversed(state_snapshots):
+        messages = state.values.get("messages", [])
+        for msg in messages:
+            if isinstance(msg, ToolMessage):
+                tool_results[msg.tool_call_id] = msg.content
+
+    # Проходим по истории и выводим только уникальные вызовы
+    for state in reversed(state_snapshots):
+        messages = state.values.get("messages", [])
+        for msg in messages:
+            if isinstance(msg, AIMessage) and msg.tool_calls:
+                printed_any = False
+                for call in msg.tool_calls:
+                    call_id = call["id"]
+                    tool_name = call["name"]
+                    args = call["args"]
+                    result = tool_results.get(call_id, "<результат отсутствует>")
+                    key = (call_id, str(result))
+                    if key not in seen:
+                        if not printed_any:
+                            print(f"Step {state.metadata.get('step', '?')}:")
+                            printed_any = True
+                        print(f"  Tool called: {tool_name}")
+                        print(f"    Args: {args}")
+                        print(f"    Result: {result}")
+                        seen.add(key)
+                if printed_any:
+                    print()
