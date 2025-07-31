@@ -8,8 +8,8 @@ from API import API_bot, my_chat_id
 
 
 class SimpleTelegramLogger:
-    def __init__(self, bot, chat_id):
-        self.max_length = 4000
+    def __init__(self, bot, chat_id, max_length=4000, stderr=False):
+        self.max_length = max_length
         self.bot = bot
         self.chat_id = chat_id
         self.input_queue = Queue()
@@ -23,7 +23,8 @@ class SimpleTelegramLogger:
 
         # Перехватываем потоки
         sys.stdout = self
-        sys.stderr = self
+        if stderr:
+            sys.stderr = self
         builtins.input = self._input_handler
 
         # Запускаем поток для консольного ввода
@@ -50,6 +51,7 @@ class SimpleTelegramLogger:
             # Выводим в оригинальный stdout
             def write_format(x: str) -> str:
                 return x + "\n" if bool_buffer else x
+
             self.original_stdout.write(write_format(message))
 
             # Отправляем в Telegram (без буферизации)
