@@ -98,7 +98,3 @@ class SimpleTelegramLogger:
             error_msg = f"🚨 Ошибка: {exc_type.__name__}: {exc_val}"
             #self.bot.send_message(self.chat_id, error_msg)
             self.original_stdout.write(f"\n{error_msg}\n")
-
-
-with SimpleTelegramLogger(bot=telebot.TeleBot(API_bot), chat_id=my_chat_id):
-    import agent
